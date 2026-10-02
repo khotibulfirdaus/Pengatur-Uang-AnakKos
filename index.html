@@ -2,7 +2,9 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#121212" />
   <title>Pengatur uang AnakKos</title>
 
   <!-- Tailwind CSS lewat CDN: tidak perlu instalasi, cukup satu tag script -->
@@ -12,6 +14,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <style>
+    :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    html { background: #121212; scroll-padding-top: env(safe-area-inset-top, 0px); }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
     /* Hilangkan panah naik-turun pada input angka */
     input[type=number]::-webkit-inner-spin-button,
@@ -37,11 +41,11 @@
         <p id="saldo" class="text-3xl font-extrabold text-white mt-1 break-words">Rp 0</p>
       </div>
       <div class="rounded-2xl bg-[#1e1e2e] border border-teal-300/20 p-4">
-        <p class="text-sm text-zinc-400">Pemasukan</p>
+        <p id="labelMasuk" class="text-sm text-zinc-400">Pemasukan</p>
         <p id="totalMasuk" class="text-lg font-bold text-teal-300 mt-1 break-words">Rp 0</p>
       </div>
       <div class="rounded-2xl bg-[#1e1e2e] border border-rose-400/20 p-4">
-        <p class="text-sm text-zinc-400">Pengeluaran</p>
+        <p id="labelKeluar" class="text-sm text-zinc-400">Pengeluaran</p>
         <p id="totalKeluar" class="text-lg font-bold text-rose-400 mt-1 break-words">Rp 0</p>
       </div>
     </section>
@@ -86,6 +90,25 @@
           </select>
         </div>
 
+        <!-- Tanggal, bulan, dan tahun transaksi (otomatis terisi hari ini) -->
+        <div class="grid grid-cols-[4.5rem_1fr_5.5rem] gap-2">
+          <div>
+            <label for="tanggal" class="block text-sm text-zinc-400 mb-1">Tanggal</label>
+            <select id="tanggal"
+              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-2 text-white focus:outline-none focus:border-teal-300"></select>
+          </div>
+          <div>
+            <label for="bulan" class="block text-sm text-zinc-400 mb-1">Bulan</label>
+            <select id="bulan"
+              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-3 text-white focus:outline-none focus:border-teal-300"></select>
+          </div>
+          <div>
+            <label for="tahun" class="block text-sm text-zinc-400 mb-1">Tahun</label>
+            <select id="tahun"
+              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-2 text-white focus:outline-none focus:border-teal-300"></select>
+          </div>
+        </div>
+
         <!-- Pesan error tampil di sini bila form belum lengkap -->
         <p id="pesanError" class="hidden text-sm text-rose-400" role="alert"></p>
 
@@ -97,10 +120,16 @@
     <!-- ===== Riwayat Transaksi ===== -->
     <section>
       <h2 class="text-lg font-bold text-white mb-3">Riwayat transaksi</h2>
+
+      <!-- Filter: pilih bulan/tahun untuk melihat riwayat dan total periode itu -->
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <select id="filterBulan" aria-label="Filter bulan"
+          class="w-full min-h-[48px] rounded-xl bg-[#1e1e2e] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300"></select>
+        <select id="filterTahun" aria-label="Filter tahun"
+          class="w-full min-h-[48px] rounded-xl bg-[#1e1e2e] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300"></select>
+      </div>
       <ul id="daftar" class="space-y-2"></ul>
-      <p id="kosong" class="hidden text-center text-zinc-500 py-8">
-        Belum ada transaksi. Isi formulir di atas untuk mencatat yang pertama.
-      </p>
+      <p id="kosong" class="hidden text-center text-zinc-500 py-8"></p>
     </section>
   </main>
 
@@ -115,6 +144,18 @@
 
     // Kunci penyimpanan di LocalStorage (bebas, asal konsisten)
     const KUNCI_STORAGE = 'pengatur-uang-anakkos-transaksi';
+
+    // Nama bulan: indeks 0 = Januari ... 11 = Desember (sesuai Date.getMonth())
+    const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Rentang tahun yang bisa dipilih (ubah angka ini kalau ingin rentang lain)
+    const TAHUN_AWAL = 2026;
+    const TAHUN_AKHIR = 2030;
+
+    // Filter riwayat yang sedang aktif ('semua' atau angka)
+    let filterBulan = 'semua';
+    let filterTahun = 'semua';
 
     // Tipe yang sedang dipilih di formulir (awalnya pengeluaran)
     let tipeAktif = 'pengeluaran';
@@ -133,7 +174,12 @@
 
     // Menyimpan data: JSON.stringify mengubah array -> teks.
     function simpanData() {
-      localStorage.setItem(KUNCI_STORAGE, JSON.stringify(transaksi));
+      try {
+        localStorage.setItem(KUNCI_STORAGE, JSON.stringify(transaksi));
+      } catch (e) {
+        // Jika penyimpanan diblokir browser (mis. mode privat), aplikasi tetap jalan
+        // tetapi data tidak tersimpan setelah halaman ditutup.
+      }
     }
 
     // Saat halaman dibuka, ambil data yang tersimpan
@@ -152,21 +198,76 @@
       return el.innerHTML;
     }
 
-    // Format tanggal: "12 Mei 2025"
-    function formatTanggal(ms) {
-      return new Date(ms).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    // Ambil bulan/tahun sebuah transaksi.
+    // Transaksi lama (tanpa bulan/tahun) memakai waktu pencatatannya (id).
+    function bulanDari(t) {
+      return typeof t.bulan === 'number' ? t.bulan : new Date(t.id).getMonth();
+    }
+    function tahunDari(t) {
+      return typeof t.tahun === 'number' ? t.tahun : new Date(t.id).getFullYear();
+    }
+
+    function tanggalDari(t) {
+      return typeof t.tanggal === 'number' ? t.tanggal : new Date(t.id).getDate();
+    }
+
+    // Isi semua pilihan tanggal, bulan & tahun (formulir dan filter)
+    function isiPilihanPeriode() {
+      const sekarang = new Date();
+
+      // Tanggal 1-31
+      let opsiTanggal = '';
+      for (let d = 1; d <= 31; d++) opsiTanggal += `<option value="${d}">${d}</option>`;
+
+      // Bulan Januari-Desember
+      const opsiBulan = NAMA_BULAN.map((nama, i) => `<option value="${i}">${nama}</option>`).join('');
+
+      // Tahun TAHUN_AWAL sampai TAHUN_AKHIR (2026-2030)
+      let opsiTahun = '';
+      for (let y = TAHUN_AWAL; y <= TAHUN_AKHIR; y++) opsiTahun += `<option value="${y}">${y}</option>`;
+
+      // Formulir: bawaan = hari ini (tahun memakai TAHUN_AWAL jika di luar rentang)
+      document.getElementById('tanggal').innerHTML = opsiTanggal;
+      document.getElementById('bulan').innerHTML = opsiBulan;
+      document.getElementById('tahun').innerHTML = opsiTahun;
+      document.getElementById('tanggal').value = sekarang.getDate();
+      document.getElementById('bulan').value = sekarang.getMonth();
+      const tahunIni = sekarang.getFullYear();
+      document.getElementById('tahun').value =
+        (tahunIni >= TAHUN_AWAL && tahunIni <= TAHUN_AKHIR) ? tahunIni : TAHUN_AWAL;
+
+      // Filter: bawaan = semua
+      document.getElementById('filterBulan').innerHTML = '<option value="semua">Semua bulan</option>' + opsiBulan;
+      document.getElementById('filterTahun').innerHTML = '<option value="semua">Semua tahun</option>' + opsiTahun;
+      document.getElementById('filterBulan').value = filterBulan;
+      document.getElementById('filterTahun').value = filterTahun;
     }
 
     // ---------- 3. MENAMPILKAN DATA ----------
     function render() {
-      // reduce() menjumlahkan semua nominal sesuai tipe
-      const totalMasuk = transaksi
+      // Saldo selalu dihitung dari SEMUA transaksi (tidak terpengaruh filter)
+      const saldo = transaksi.reduce(
+        (jumlah, t) => jumlah + (t.tipe === 'pemasukan' ? t.nominal : -t.nominal), 0);
+
+      // Transaksi pada periode yang dipilih di filter
+      const periode = transaksi.filter(t =>
+        (filterBulan === 'semua' || bulanDari(t) === Number(filterBulan)) &&
+        (filterTahun === 'semua' || tahunDari(t) === Number(filterTahun)));
+
+      // reduce() menjumlahkan nominal periode itu sesuai tipe
+      const totalMasuk = periode
         .filter(t => t.tipe === 'pemasukan')
         .reduce((jumlah, t) => jumlah + t.nominal, 0);
-      const totalKeluar = transaksi
+      const totalKeluar = periode
         .filter(t => t.tipe === 'pengeluaran')
         .reduce((jumlah, t) => jumlah + t.nominal, 0);
-      const saldo = totalMasuk - totalKeluar;
+
+      // Keterangan periode di label kartu, mis. "Mei 2026" atau "semua"
+      const namaPeriode = (filterBulan === 'semua' ? '' : NAMA_BULAN[Number(filterBulan)] + ' ')
+        + (filterTahun === 'semua' ? '' : filterTahun);
+      const ket = namaPeriode.trim() ? ' (' + namaPeriode.trim() + ')' : ' (semua)';
+      document.getElementById('labelMasuk').textContent = 'Pemasukan' + ket;
+      document.getElementById('labelKeluar').textContent = 'Pengeluaran' + ket;
 
       // Isi 3 kartu ringkasan
       const elSaldo = document.getElementById('saldo');
@@ -176,9 +277,11 @@
       document.getElementById('totalMasuk').textContent = formatRupiah(totalMasuk);
       document.getElementById('totalKeluar').textContent = formatRupiah(totalKeluar);
 
-      // Susun daftar riwayat (yang terbaru di atas)
+      // Susun daftar riwayat: tanggal terbaru di atas, lalu yang paling baru dicatat
       const daftar = document.getElementById('daftar');
-      const terurut = [...transaksi].sort((a, b) => b.id - a.id);
+      const terurut = [...periode].sort((a, b) =>
+        (tahunDari(b) - tahunDari(a)) || (bulanDari(b) - bulanDari(a)) ||
+        (tanggalDari(b) - tanggalDari(a)) || (b.id - a.id));
 
       daftar.innerHTML = terurut.map(t => {
         const masuk = t.tipe === 'pemasukan';
@@ -187,7 +290,7 @@
             <div class="w-1 self-stretch rounded-full ${masuk ? 'bg-teal-300' : 'bg-rose-400'}"></div>
             <div class="flex-1 min-w-0">
               <p class="font-semibold text-white truncate">${aman(t.judul)}</p>
-              <p class="text-xs text-zinc-500">${aman(t.kategori)} &middot; ${formatTanggal(t.id)}</p>
+              <p class="text-xs text-zinc-500">${aman(t.kategori)} &middot; ${tanggalDari(t)} ${NAMA_BULAN[bulanDari(t)]} ${tahunDari(t)}</p>
             </div>
             <p class="font-bold whitespace-nowrap ${masuk ? 'text-teal-300' : 'text-rose-400'}">
               ${masuk ? '+' : '-'}${formatRupiah(t.nominal)}
@@ -200,8 +303,12 @@
           </li>`;
       }).join('');
 
-      // Tampilkan pesan kosong bila belum ada data
-      document.getElementById('kosong').classList.toggle('hidden', transaksi.length > 0);
+      // Pesan kosong: beda untuk "belum ada data" dan "tidak ada data di periode ini"
+      const kosong = document.getElementById('kosong');
+      kosong.textContent = transaksi.length === 0
+        ? 'Belum ada transaksi. Isi formulir di atas untuk mencatat yang pertama.'
+        : 'Tidak ada transaksi pada periode ini.';
+      kosong.classList.toggle('hidden', periode.length > 0);
     }
 
     // ---------- 4. FORMULIR ----------
@@ -228,6 +335,11 @@
         (tipe === 'pemasukan' ? 'bg-teal-300' : 'bg-rose-400');
 
       isiKategori();
+
+      // Contoh isi judul menyesuaikan tipe transaksi
+      document.getElementById('judul').placeholder = tipe === 'pemasukan'
+        ? 'Contoh: Uang jajan / kiriman orang tua'
+        : 'Contoh: Makan siang warteg';
     }
 
     // Klik tombol tipe
@@ -255,10 +367,18 @@
       const judul = document.getElementById('judul').value.trim();
       const nominal = Number(document.getElementById('nominal').value);
       const kategori = document.getElementById('kategori').value;
+      const tanggal = Number(document.getElementById('tanggal').value);
+      const bulan = Number(document.getElementById('bulan').value);
+      const tahun = Number(document.getElementById('tahun').value);
 
       // Validasi sederhana
       if (!judul) return tampilError('Judul transaksi belum diisi.');
       if (!nominal || nominal <= 0) return tampilError('Nominal harus lebih dari 0.');
+      // Cek tanggal ada di kalender (mis. 31 Februari tidak ada).
+      // Jika tanggal terlalu besar, JavaScript otomatis pindah ke bulan berikutnya.
+      if (new Date(tahun, bulan, tanggal).getMonth() !== bulan) {
+        return tampilError('Tanggal ' + tanggal + ' tidak ada di bulan ' + NAMA_BULAN[bulan] + ' ' + tahun + '.');
+      }
       tampilError('');
 
       // Buat satu objek transaksi. id memakai waktu sekarang (unik untuk tiap transaksi)
@@ -267,6 +387,9 @@
         judul: judul,
         nominal: Math.round(nominal),
         kategori: kategori,
+        tanggal: tanggal,
+        bulan: bulan,
+        tahun: tahun,
         tipe: tipeAktif
       });
 
@@ -277,6 +400,16 @@
       document.getElementById('judul').value = '';
       document.getElementById('nominal').value = '';
       document.getElementById('judul').focus();
+    });
+
+    // Saat filter bulan/tahun diganti, simpan pilihannya lalu gambar ulang
+    document.getElementById('filterBulan').addEventListener('change', (e) => {
+      filterBulan = e.target.value;
+      render();
+    });
+    document.getElementById('filterTahun').addEventListener('change', (e) => {
+      filterTahun = e.target.value;
+      render();
     });
 
     // ---------- 5. HAPUS TRANSAKSI ----------
@@ -295,6 +428,7 @@
     });
 
     // ---------- 6. MULAI ----------
+    isiPilihanPeriode();     // isi pilihan bulan & tahun
     aturTipe('pengeluaran'); // atur tampilan awal formulir
     render();                // tampilkan data yang tersimpan
   </script>
