@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pengatur uang AnakKos</title>
+
+  <!-- Tailwind CSS lewat CDN: tidak perlu instalasi, cukup satu tag script -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Plus Jakarta Sans (opsional, ada fallback bila offline) -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    /* Hilangkan panah naik-turun pada input angka */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+
+<body class="bg-[#121212] text-zinc-200 min-h-screen">
+  <main class="max-w-xl mx-auto px-4 pb-16 pt-6">
+
+    <!-- ===== Header ===== -->
+    <header class="mb-6">
+      <h1 class="text-2xl font-extrabold text-white">Pengatur uang <span class="text-teal-300">AnakKos</span></h1>
+      <p class="text-sm text-zinc-400">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+    </header>
+
+    <!-- ===== Ringkasan Dompet: 3 kartu ===== -->
+    <section class="grid grid-cols-2 gap-3 mb-6">
+      <!-- Saldo memanjang penuh di HP, jadi paling menonjol -->
+      <div class="col-span-2 rounded-2xl bg-[#1e1e2e] border border-white/5 p-5">
+        <p class="text-sm text-zinc-400">Total saldo saat ini</p>
+        <p id="saldo" class="text-3xl font-extrabold text-white mt-1 break-words">Rp 0</p>
+      </div>
+      <div class="rounded-2xl bg-[#1e1e2e] border border-teal-300/20 p-4">
+        <p class="text-sm text-zinc-400">Pemasukan</p>
+        <p id="totalMasuk" class="text-lg font-bold text-teal-300 mt-1 break-words">Rp 0</p>
+      </div>
+      <div class="rounded-2xl bg-[#1e1e2e] border border-rose-400/20 p-4">
+        <p class="text-sm text-zinc-400">Pengeluaran</p>
+        <p id="totalKeluar" class="text-lg font-bold text-rose-400 mt-1 break-words">Rp 0</p>
+      </div>
+    </section>
+
+    <!-- ===== Form Transaksi ===== -->
+    <section class="rounded-2xl bg-[#1e1e2e] border border-white/5 p-5 mb-6">
+      <h2 class="text-lg font-bold text-white mb-4">Catat transaksi</h2>
+
+      <!-- Catatan: pakai <form> agar tombol Enter di HP/laptop otomatis menyimpan -->
+      <form id="formTransaksi" class="space-y-4" novalidate>
+
+        <!-- Pilihan tipe: dua tombol besar yang mudah ditekan jari -->
+        <div class="grid grid-cols-2 gap-2 bg-[#121212] p-1 rounded-xl" role="group" aria-label="Tipe transaksi">
+          <button type="button" id="btnPengeluaran" data-tipe="pengeluaran"
+            class="tipe-btn min-h-[48px] rounded-lg font-semibold transition">Pengeluaran</button>
+          <button type="button" id="btnPemasukan" data-tipe="pemasukan"
+            class="tipe-btn min-h-[48px] rounded-lg font-semibold transition">Pemasukan</button>
+        </div>
+
+        <div>
+          <label for="judul" class="block text-sm text-zinc-400 mb-1">Judul transaksi</label>
+          <input id="judul" type="text" maxlength="60" placeholder="Contoh: Makan siang warteg"
+            class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-4 text-white placeholder-zinc-600 focus:outline-none focus:border-teal-300" />
+        </div>
+
+        <div>
+          <label for="nominal" class="block text-sm text-zinc-400 mb-1">Nominal (Rupiah)</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">Rp</span>
+            <input id="nominal" type="number" inputmode="numeric" min="1" placeholder="0"
+              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 pl-12 pr-4 text-white placeholder-zinc-600 focus:outline-none focus:border-teal-300" />
+          </div>
+        </div>
+
+        <div>
+          <label for="kategori" class="block text-sm text-zinc-400 mb-1">Kategori</label>
+          <!-- Kategori hanya dua pilihan; otomatis ikut tombol tipe di atas -->
+          <select id="kategori"
+            class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300">
+            <option value="Pengeluaran">Pengeluaran</option>
+            <option value="Pemasukan">Pemasukan</option>
+          </select>
+        </div>
+
+        <!-- Pesan error tampil di sini bila form belum lengkap -->
+        <p id="pesanError" class="hidden text-sm text-rose-400" role="alert"></p>
+
+        <button type="submit" id="btnSimpan"
+          class="w-full min-h-[52px] rounded-xl font-bold text-[#121212] transition active:scale-[0.98]">Simpan transaksi</button>
+      </form>
+    </section>
+
+    <!-- ===== Riwayat Transaksi ===== -->
+    <section>
+      <h2 class="text-lg font-bold text-white mb-3">Riwayat transaksi</h2>
+      <ul id="daftar" class="space-y-2"></ul>
+      <p id="kosong" class="hidden text-center text-zinc-500 py-8">
+        Belum ada transaksi. Isi formulir di atas untuk mencatat yang pertama.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    /* =========================================================
+       Pengatur uang AnakKos - logika aplikasi (Vanilla JavaScript)
+       Alur kerja singkat:
+       1. Data transaksi disimpan dalam array `transaksi`.
+       2. Setiap ada perubahan (tambah/hapus) -> simpan ke LocalStorage -> gambar ulang layar.
+       3. Saat halaman dibuka, array diisi dari LocalStorage.
+       ========================================================= */
+
+    // Kunci penyimpanan di LocalStorage (bebas, asal konsisten)
+    const KUNCI_STORAGE = 'pengatur-uang-anakkos-transaksi';
+
+    // Tipe yang sedang dipilih di formulir (awalnya pengeluaran)
+    let tipeAktif = 'pengeluaran';
+
+    // ---------- 1. LOCALSTORAGE ----------
+    // Membaca data. LocalStorage hanya bisa menyimpan teks,
+    // jadi data diubah dengan JSON.parse (teks -> array).
+    function muatData() {
+      try {
+        const teks = localStorage.getItem(KUNCI_STORAGE);
+        return teks ? JSON.parse(teks) : [];
+      } catch (e) {
+        return []; // Jika data rusak, mulai dari kosong
+      }
+    }
+
+    // Menyimpan data: JSON.stringify mengubah array -> teks.
+    function simpanData() {
+      localStorage.setItem(KUNCI_STORAGE, JSON.stringify(transaksi));
+    }
+
+    // Saat halaman dibuka, ambil data yang tersimpan
+    let transaksi = muatData();
+
+    // ---------- 2. FUNGSI BANTU ----------
+    // Format angka ke Rupiah: 15000 -> "Rp 15.000"
+    function formatRupiah(angka) {
+      return 'Rp ' + new Intl.NumberFormat('id-ID').format(angka);
+    }
+
+    // Mencegah teks buatan pengguna dibaca sebagai kode HTML (keamanan dasar)
+    function aman(teks) {
+      const el = document.createElement('div');
+      el.textContent = teks;
+      return el.innerHTML;
+    }
+
+    // Format tanggal: "12 Mei 2025"
+    function formatTanggal(ms) {
+      return new Date(ms).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    // ---------- 3. MENAMPILKAN DATA ----------
+    function render() {
+      // reduce() menjumlahkan semua nominal sesuai tipe
+      const totalMasuk = transaksi
+        .filter(t => t.tipe === 'pemasukan')
+        .reduce((jumlah, t) => jumlah + t.nominal, 0);
+      const totalKeluar = transaksi
+        .filter(t => t.tipe === 'pengeluaran')
+        .reduce((jumlah, t) => jumlah + t.nominal, 0);
+      const saldo = totalMasuk - totalKeluar;
+
+      // Isi 3 kartu ringkasan
+      const elSaldo = document.getElementById('saldo');
+      elSaldo.textContent = formatRupiah(saldo);
+      // Saldo negatif diberi warna coral sebagai peringatan
+      elSaldo.className = 'text-3xl font-extrabold mt-1 break-words ' + (saldo < 0 ? 'text-rose-400' : 'text-white');
+      document.getElementById('totalMasuk').textContent = formatRupiah(totalMasuk);
+      document.getElementById('totalKeluar').textContent = formatRupiah(totalKeluar);
+
+      // Susun daftar riwayat (yang terbaru di atas)
+      const daftar = document.getElementById('daftar');
+      const terurut = [...transaksi].sort((a, b) => b.id - a.id);
+
+      daftar.innerHTML = terurut.map(t => {
+        const masuk = t.tipe === 'pemasukan';
+        return `
+          <li class="flex items-center gap-3 rounded-xl bg-[#1e1e2e] border border-white/5 p-3">
+            <div class="w-1 self-stretch rounded-full ${masuk ? 'bg-teal-300' : 'bg-rose-400'}"></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-white truncate">${aman(t.judul)}</p>
+              <p class="text-xs text-zinc-500">${aman(t.kategori)} &middot; ${formatTanggal(t.id)}</p>
+            </div>
+            <p class="font-bold whitespace-nowrap ${masuk ? 'text-teal-300' : 'text-rose-400'}">
+              ${masuk ? '+' : '-'}${formatRupiah(t.nominal)}
+            </p>
+            <!-- data-id dipakai untuk tahu transaksi mana yang dihapus -->
+            <button data-id="${t.id}" aria-label="Hapus ${aman(t.judul)}"
+              class="btn-hapus min-h-[44px] px-3 rounded-lg text-sm text-zinc-400 border border-white/10 hover:text-rose-400 hover:border-rose-400/40 transition">
+              Hapus
+            </button>
+          </li>`;
+      }).join('');
+
+      // Tampilkan pesan kosong bila belum ada data
+      document.getElementById('kosong').classList.toggle('hidden', transaksi.length > 0);
+    }
+
+    // ---------- 4. FORMULIR ----------
+    // Menyamakan pilihan kategori dengan tipe yang aktif
+    // (nilai kategori sama dengan nama tipe: "Pemasukan" / "Pengeluaran")
+    function isiKategori() {
+      document.getElementById('kategori').value =
+        tipeAktif === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran';
+    }
+
+    // Mengubah tampilan tombol tipe + tombol simpan sesuai pilihan
+    function aturTipe(tipe) {
+      tipeAktif = tipe;
+      const aktifMasuk = 'bg-teal-300 text-[#121212]';
+      const aktifKeluar = 'bg-rose-400 text-[#121212]';
+      const mati = 'text-zinc-400';
+
+      document.getElementById('btnPemasukan').className =
+        'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pemasukan' ? aktifMasuk : mati);
+      document.getElementById('btnPengeluaran').className =
+        'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pengeluaran' ? aktifKeluar : mati);
+      document.getElementById('btnSimpan').className =
+        'w-full min-h-[52px] rounded-xl font-bold text-[#121212] transition active:scale-[0.98] ' +
+        (tipe === 'pemasukan' ? 'bg-teal-300' : 'bg-rose-400');
+
+      isiKategori();
+    }
+
+    // Klik tombol tipe
+    document.querySelectorAll('.tipe-btn').forEach(btn => {
+      btn.addEventListener('click', () => aturTipe(btn.dataset.tipe));
+    });
+
+    // Kalau kategori diganti lewat dropdown, tipe ikut berubah
+    document.getElementById('kategori').addEventListener('change', (e) => {
+      aturTipe(e.target.value === 'Pemasukan' ? 'pemasukan' : 'pengeluaran');
+    });
+
+    // Menampilkan / menyembunyikan pesan error
+    function tampilError(pesan) {
+      const el = document.getElementById('pesanError');
+      el.textContent = pesan;
+      el.classList.toggle('hidden', !pesan);
+      if (pesan) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    // Saat formulir dikirim (tombol Simpan atau Enter)
+    document.getElementById('formTransaksi').addEventListener('submit', (e) => {
+      e.preventDefault(); // Cegah halaman reload
+
+      const judul = document.getElementById('judul').value.trim();
+      const nominal = Number(document.getElementById('nominal').value);
+      const kategori = document.getElementById('kategori').value;
+
+      // Validasi sederhana
+      if (!judul) return tampilError('Judul transaksi belum diisi.');
+      if (!nominal || nominal <= 0) return tampilError('Nominal harus lebih dari 0.');
+      tampilError('');
+
+      // Buat satu objek transaksi. id memakai waktu sekarang (unik untuk tiap transaksi)
+      transaksi.push({
+        id: Date.now(),
+        judul: judul,
+        nominal: Math.round(nominal),
+        kategori: kategori,
+        tipe: tipeAktif
+      });
+
+      simpanData(); // simpan ke LocalStorage
+      render();     // gambar ulang layar
+
+      // Kosongkan isian, lalu arahkan kursor ke judul untuk catatan berikutnya
+      document.getElementById('judul').value = '';
+      document.getElementById('nominal').value = '';
+      document.getElementById('judul').focus();
+    });
+
+    // ---------- 5. HAPUS TRANSAKSI ----------
+    // "Event delegation": satu pendengar di <ul> menangani semua tombol Hapus,
+    // termasuk tombol yang baru dibuat setelah render().
+    document.getElementById('daftar').addEventListener('click', (e) => {
+      const tombol = e.target.closest('.btn-hapus');
+      if (!tombol) return;
+
+      const id = Number(tombol.dataset.id);
+      // filter() membuat array baru tanpa transaksi yang dihapus
+      transaksi = transaksi.filter(t => t.id !== id);
+
+      simpanData();
+      render();
+    });
+
+    // ---------- 6. MULAI ----------
+    aturTipe('pengeluaran'); // atur tampilan awal formulir
+    render();                // tampilkan data yang tersimpan
+  </script>
+</body>
+</html>
