@@ -3,9 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="dark" />
-  <meta name="theme-color" content="#121212" />
-  <title>Pengatur uang AnakKos</title>
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Catatan Keuangan Mahasiswa</title>
+
+  <!-- Pasang tema tersimpan SEBELUM halaman tampil, supaya tidak berkedip -->
+  <script>
+    try {
+      document.documentElement.setAttribute('data-tema',
+        localStorage.getItem('tema-aplikasi') === 'terang' ? 'terang' : 'gelap');
+    } catch (e) {
+      document.documentElement.setAttribute('data-tema', 'gelap');
+    }
+  </script>
 
   <!-- Tailwind CSS lewat CDN: tidak perlu instalasi, cukup satu tag script -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,51 +24,143 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <style>
-    :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
-    html { background: #121212; scroll-padding-top: env(safe-area-inset-top, 0px); }
-    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
-    /* Hilangkan panah naik-turun pada input angka */
+    /* ===== TEMA: semua warna dikumpulkan di sini sebagai variabel ===== */
+    /* Tema gelap = Midnight Blue (bawaan) */
+    :root {
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      color-scheme: dark;
+      --bg: #0f172a;                         /* latar halaman */
+      --kartu: #1e293b;                      /* latar kartu */
+      --kolom: #0f172a;                      /* latar kolom isian */
+      --garis: rgba(255, 255, 255, 0.10);    /* garis tepi */
+      --teks: #f8fafc;                       /* teks utama */
+      --redup: #94a3b8;                      /* teks label */
+      --sunyi: #8393a9;                      /* teks kecil/keterangan */
+      --masuk: #7dd3fc;                      /* warna pemasukan */
+      --masuk-garis: rgba(125, 211, 252, 0.28);
+      --keluar: #fb7185;                     /* warna pengeluaran */
+      --keluar-garis: rgba(251, 113, 133, 0.28);
+      --teks-tombol: #0f172a;                /* teks di atas tombol berwarna */
+    }
+    /* Tema terang = Clean Light */
+    :root[data-tema="terang"] {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --kartu: #ffffff;
+      --kolom: #f1f5f9;
+      --garis: rgba(15, 23, 42, 0.14);
+      --teks: #0f172a;
+      --redup: #475569;
+      --sunyi: #64748b;
+      --masuk: #047857;
+      --masuk-garis: rgba(4, 120, 87, 0.35);
+      --keluar: #e11d48;
+      --keluar-garis: rgba(225, 29, 72, 0.35);
+      --teks-tombol: #ffffff;
+    }
+
+    html { background: var(--bg); scroll-padding-top: env(safe-area-inset-top, 0px); }
+    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+           background: var(--bg); color: var(--teks); }
+
+    /* Kelas warna buatan sendiri, memakai variabel di atas ("html" di depan = prioritas lebih tinggi dari reset Tailwind) */
+    html .bg-kartu { background: var(--kartu); }
+    html .bg-kolom { background: var(--kolom); }
+    html .bg-masuk { background: var(--masuk); }
+    html .bg-keluar { background: var(--keluar); }
+    html .garis-warna { border-color: var(--garis); }
+    html .garis-masuk { border-color: var(--masuk-garis); }
+    html .garis-keluar { border-color: var(--keluar-garis); }
+    html .teks-utama { color: var(--teks); }
+    html .teks-redup { color: var(--redup); }
+    html .teks-sunyi { color: var(--sunyi); }
+    html .teks-masuk { color: var(--masuk); }
+    html .teks-keluar { color: var(--keluar); }
+    html .teks-tombol { color: var(--teks-tombol); }
+    html .tombol-netral { background: var(--teks); color: var(--bg); }
+    html .fokus-masuk:focus { border-color: var(--masuk); }
+    html .hover-utama:hover { color: var(--teks); }
+    html .hover-keluar:hover { color: var(--keluar); border-color: var(--keluar-garis); }
+    html .placeholder-sunyi::placeholder { color: var(--sunyi); opacity: 0.75; }
+
+    /* Hilangkan panah naik-turun pada input angka (dipakai kolom tahun sendiri) */
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number] { -moz-appearance: textfield; }
   </style>
 </head>
 
-<body class="bg-[#121212] text-zinc-200 min-h-screen">
-  <main class="max-w-xl mx-auto px-4 pb-16 pt-6">
+<body class="min-h-screen">
+
+  <!-- ===== Layar 1: Memuat (tampil sebentar saat mengecek status login) ===== -->
+  <div id="layarMuat" class="min-h-screen flex items-center justify-center teks-redup">Memuat...</div>
+
+  <!-- ===== Layar 2: Login ===== -->
+  <main id="layarLogin" class="hidden max-w-xl mx-auto px-4 pt-6 pb-16">
+    <div class="flex justify-end mb-12">
+      <button type="button" class="btn-tema shrink-0 min-h-[44px] px-3 rounded-xl border garis-warna text-sm teks-redup hover-utama transition"></button>
+    </div>
+    <h1 class="text-3xl font-extrabold teks-utama">Catatan Keuangan <span class="teks-masuk">Mahasiswa</span></h1>
+    <p class="teks-redup mt-2">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+
+    <div class="mt-8 rounded-2xl bg-kartu border garis-warna p-5">
+      <h2 class="text-lg font-bold teks-utama">Masuk dulu</h2>
+      <p class="text-sm teks-redup mt-1">
+        Masuk dengan akun Google agar catatanmu tersimpan di cloud dan tidak hilang
+        walaupun data browser dihapus. Cukup masuk sekali di perangkat ini.
+      </p>
+      <button id="btnMasuk"
+        class="mt-5 w-full min-h-[52px] rounded-xl tombol-netral font-bold transition active:scale-[0.98]">
+        Masuk dengan Google
+      </button>
+      <p id="pesanLogin" class="hidden mt-3 text-sm teks-keluar" role="alert"></p>
+    </div>
+  </main>
+
+  <!-- ===== Layar 3: Aplikasi (tampil setelah login) ===== -->
+  <main id="layarApp" class="hidden max-w-xl mx-auto px-4 pb-16 pt-6">
 
     <!-- ===== Header ===== -->
-    <header class="mb-6">
-      <h1 class="text-2xl font-extrabold text-white">Pengatur uang <span class="text-teal-300">AnakKos</span></h1>
-      <p class="text-sm text-zinc-400">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+    <header class="mb-6 flex items-start justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-extrabold teks-utama">Catatan Keuangan <span class="teks-masuk">Mahasiswa</span></h1>
+        <p class="text-sm teks-redup">Catat uang masuk dan keluar supaya akhir bulan tetap aman.</p>
+      </div>
+      <button id="btnKeluar"
+        class="shrink-0 min-h-[44px] px-4 rounded-xl border garis-warna text-sm teks-redup hover-utama transition">Keluar</button>
     </header>
+    <div class="-mt-3 mb-5 flex items-center justify-between gap-3">
+      <p id="infoAkun" class="min-w-0 text-xs teks-sunyi truncate"></p>
+      <button type="button" class="btn-tema shrink-0 min-h-[44px] px-3 rounded-xl border garis-warna text-sm teks-redup hover-utama transition"></button>
+    </div>
+    <p id="pesanCloud" class="hidden mb-4 text-sm teks-keluar" role="alert"></p>
 
     <!-- ===== Ringkasan Dompet: 3 kartu ===== -->
     <section class="grid grid-cols-2 gap-3 mb-6">
-      <!-- Saldo memanjang penuh di HP, jadi paling menonjol -->
-      <div class="col-span-2 rounded-2xl bg-[#1e1e2e] border border-white/5 p-5">
-        <p class="text-sm text-zinc-400">Total saldo saat ini</p>
-        <p id="saldo" class="text-3xl font-extrabold text-white mt-1 break-words">Rp 0</p>
+      <div class="col-span-2 rounded-2xl bg-kartu border garis-warna p-5">
+        <p class="text-sm teks-redup">Total saldo saat ini</p>
+        <p id="saldo" class="text-3xl font-extrabold teks-utama mt-1 break-words">Rp 0</p>
       </div>
-      <div class="rounded-2xl bg-[#1e1e2e] border border-teal-300/20 p-4">
-        <p id="labelMasuk" class="text-sm text-zinc-400">Pemasukan</p>
-        <p id="totalMasuk" class="text-lg font-bold text-teal-300 mt-1 break-words">Rp 0</p>
+      <div class="rounded-2xl bg-kartu border garis-masuk p-4">
+        <p id="labelMasuk" class="text-sm teks-redup">Pemasukan</p>
+        <p id="totalMasuk" class="text-lg font-bold teks-masuk mt-1 break-words">Rp 0</p>
       </div>
-      <div class="rounded-2xl bg-[#1e1e2e] border border-rose-400/20 p-4">
-        <p id="labelKeluar" class="text-sm text-zinc-400">Pengeluaran</p>
-        <p id="totalKeluar" class="text-lg font-bold text-rose-400 mt-1 break-words">Rp 0</p>
+      <div class="rounded-2xl bg-kartu border garis-keluar p-4">
+        <p id="labelKeluar" class="text-sm teks-redup">Pengeluaran</p>
+        <p id="totalKeluar" class="text-lg font-bold teks-keluar mt-1 break-words">Rp 0</p>
       </div>
     </section>
 
     <!-- ===== Form Transaksi ===== -->
-    <section class="rounded-2xl bg-[#1e1e2e] border border-white/5 p-5 mb-6">
-      <h2 class="text-lg font-bold text-white mb-4">Catat transaksi</h2>
+    <section class="rounded-2xl bg-kartu border garis-warna p-5 mb-6">
+      <h2 class="text-lg font-bold teks-utama mb-4">Catat transaksi</h2>
 
-      <!-- Catatan: pakai <form> agar tombol Enter di HP/laptop otomatis menyimpan -->
       <form id="formTransaksi" class="space-y-4" novalidate>
 
-        <!-- Pilihan tipe: dua tombol besar yang mudah ditekan jari -->
-        <div class="grid grid-cols-2 gap-2 bg-[#121212] p-1 rounded-xl" role="group" aria-label="Tipe transaksi">
+        <!-- Pilihan tipe -->
+        <div class="grid grid-cols-2 gap-2 bg-kolom p-1 rounded-xl" role="group" aria-label="Tipe transaksi">
           <button type="button" id="btnPengeluaran" data-tipe="pengeluaran"
             class="tipe-btn min-h-[48px] rounded-lg font-semibold transition">Pengeluaran</button>
           <button type="button" id="btnPemasukan" data-tipe="pemasukan"
@@ -66,371 +168,485 @@
         </div>
 
         <div>
-          <label for="judul" class="block text-sm text-zinc-400 mb-1">Judul transaksi</label>
+          <label for="judul" class="block text-sm teks-redup mb-1">Judul transaksi</label>
           <input id="judul" type="text" maxlength="60" placeholder="Contoh: Makan siang warteg"
-            class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-4 text-white placeholder-zinc-600 focus:outline-none focus:border-teal-300" />
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
         </div>
 
         <div>
-          <label for="nominal" class="block text-sm text-zinc-400 mb-1">Nominal (Rupiah)</label>
+          <label for="nominal" class="block text-sm teks-redup mb-1">Nominal (Rupiah)</label>
           <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">Rp</span>
-            <input id="nominal" type="number" inputmode="numeric" min="1" placeholder="0"
-              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 pl-12 pr-4 text-white placeholder-zinc-600 focus:outline-none focus:border-teal-300" />
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 teks-sunyi">Rp</span>
+            <!-- type="text" (bukan number) supaya titik ribuan bisa tampil; inputmode="numeric" memunculkan keypad angka di HP -->
+            <input id="nominal" type="text" inputmode="numeric" autocomplete="off" maxlength="17" placeholder="0"
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna pl-12 pr-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
           </div>
         </div>
 
         <div>
-          <label for="kategori" class="block text-sm text-zinc-400 mb-1">Kategori</label>
-          <!-- Kategori hanya dua pilihan; otomatis ikut tombol tipe di atas -->
+          <label for="kategori" class="block text-sm teks-redup mb-1">Kategori</label>
           <select id="kategori"
-            class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300">
+            class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama focus:outline-none fokus-masuk">
             <option value="Pengeluaran">Pengeluaran</option>
             <option value="Pemasukan">Pemasukan</option>
           </select>
         </div>
 
-        <!-- Tanggal, bulan, dan tahun transaksi (otomatis terisi hari ini) -->
+        <!-- Tanggal, bulan, tahun (otomatis terisi hari ini) -->
         <div class="grid grid-cols-[4.5rem_1fr_5.5rem] gap-2">
           <div>
-            <label for="tanggal" class="block text-sm text-zinc-400 mb-1">Tanggal</label>
+            <label for="tanggal" class="block text-sm teks-redup mb-1">Tanggal</label>
             <select id="tanggal"
-              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-2 text-white focus:outline-none focus:border-teal-300"></select>
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-2 teks-utama focus:outline-none fokus-masuk"></select>
           </div>
           <div>
-            <label for="bulan" class="block text-sm text-zinc-400 mb-1">Bulan</label>
+            <label for="bulan" class="block text-sm teks-redup mb-1">Bulan</label>
             <select id="bulan"
-              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-3 text-white focus:outline-none focus:border-teal-300"></select>
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-3 teks-utama focus:outline-none fokus-masuk"></select>
           </div>
           <div>
-            <label for="tahun" class="block text-sm text-zinc-400 mb-1">Tahun</label>
+            <label for="tahun" class="block text-sm teks-redup mb-1">Tahun</label>
             <select id="tahun"
-              class="w-full min-h-[48px] rounded-xl bg-[#121212] border border-white/10 px-2 text-white focus:outline-none focus:border-teal-300"></select>
+              class="w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-2 teks-utama focus:outline-none fokus-masuk"></select>
           </div>
         </div>
 
-        <!-- Pesan error tampil di sini bila form belum lengkap -->
-        <p id="pesanError" class="hidden text-sm text-rose-400" role="alert"></p>
+        <!-- Muncul hanya bila "Lainnya" dipilih di kolom tahun -->
+        <input id="tahunLain" type="number" inputmode="numeric" min="1900" max="2100"
+          placeholder="Ketik tahun sendiri, contoh: 2035"
+          class="hidden w-full min-h-[48px] rounded-xl bg-kolom border garis-warna px-4 teks-utama placeholder-sunyi focus:outline-none fokus-masuk" />
+
+        <p id="pesanError" class="hidden text-sm teks-keluar" role="alert"></p>
 
         <button type="submit" id="btnSimpan"
-          class="w-full min-h-[52px] rounded-xl font-bold text-[#121212] transition active:scale-[0.98]">Simpan transaksi</button>
+          class="w-full min-h-[52px] rounded-xl font-bold teks-tombol transition active:scale-[0.98]">Simpan transaksi</button>
       </form>
     </section>
 
     <!-- ===== Riwayat Transaksi ===== -->
     <section>
-      <h2 class="text-lg font-bold text-white mb-3">Riwayat transaksi</h2>
+      <h2 class="text-lg font-bold teks-utama mb-3">Riwayat transaksi</h2>
 
-      <!-- Filter: pilih bulan/tahun untuk melihat riwayat dan total periode itu -->
       <div class="grid grid-cols-2 gap-3 mb-3">
         <select id="filterBulan" aria-label="Filter bulan"
-          class="w-full min-h-[48px] rounded-xl bg-[#1e1e2e] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300"></select>
+          class="w-full min-h-[48px] rounded-xl bg-kartu border garis-warna px-4 teks-utama focus:outline-none fokus-masuk"></select>
         <select id="filterTahun" aria-label="Filter tahun"
-          class="w-full min-h-[48px] rounded-xl bg-[#1e1e2e] border border-white/10 px-4 text-white focus:outline-none focus:border-teal-300"></select>
+          class="w-full min-h-[48px] rounded-xl bg-kartu border garis-warna px-4 teks-utama focus:outline-none fokus-masuk"></select>
       </div>
       <ul id="daftar" class="space-y-2"></ul>
-      <p id="kosong" class="hidden text-center text-zinc-500 py-8"></p>
+      <p id="kosong" class="hidden text-center teks-sunyi py-8"></p>
     </section>
   </main>
 
-  <script>
+  <!-- type="module" wajib agar bisa memakai import dari Firebase -->
+  <script type="module">
     /* =========================================================
-       Pengatur uang AnakKos - logika aplikasi (Vanilla JavaScript)
+       Catatan Keuangan Mahasiswa - logika aplikasi
        Alur kerja singkat:
-       1. Data transaksi disimpan dalam array `transaksi`.
-       2. Setiap ada perubahan (tambah/hapus) -> simpan ke LocalStorage -> gambar ulang layar.
-       3. Saat halaman dibuka, array diisi dari LocalStorage.
+       1. Pengguna masuk dengan Google (Firebase Authentication).
+       2. Transaksi disimpan di Cloud Firestore, di bawah ID akun masing-masing.
+       3. onSnapshot "mendengarkan" database: setiap data berubah
+          (tambah/hapus), layar otomatis digambar ulang.
        ========================================================= */
 
-    // Kunci penyimpanan di LocalStorage (bebas, asal konsisten)
-    const KUNCI_STORAGE = 'pengatur-uang-anakkos-transaksi';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // Nama bulan: indeks 0 = Januari ... 11 = Desember (sesuai Date.getMonth())
+    // ---------- 0. KONFIGURASI FIREBASE ----------
+    // Konfigurasi dari proyek Firebase "catatan-keuangan-987".
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEAoB-l1SHC6bfQAPYfG-5K0EVjKif-X4",
+      authDomain: "catatan-keuangan-987.firebaseapp.com",
+      projectId: "catatan-keuangan-987",
+      storageBucket: "catatan-keuangan-987.firebasestorage.app",
+      messagingSenderId: "669337699625",
+      appId: "1:669337699625:web:381c14a89ddd0065a7e338"
+    };
+    const BELUM_DIISI = firebaseConfig.apiKey.startsWith('ISI');
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ---------- 1. DATA & KONSTANTA ----------
+    const KUNCI_LAMA = 'pengatur-uang-anakkos-transaksi'; // data lama di browser (untuk dipindahkan)
     const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-    // Rentang tahun yang bisa dipilih (ubah angka ini kalau ingin rentang lain)
     const TAHUN_AWAL = 2026;
     const TAHUN_AKHIR = 2030;
 
-    // Filter riwayat yang sedang aktif ('semua' atau angka)
+    let transaksi = [];          // isi diambil dari Firestore
+    let pengguna = null;         // akun yang sedang login
+    let batalLangganan = null;   // fungsi untuk berhenti "mendengarkan" database
+    let sudahCekMigrasi = false; // cek data lama hanya sekali per login
     let filterBulan = 'semua';
     let filterTahun = 'semua';
-
-    // Tipe yang sedang dipilih di formulir (awalnya pengeluaran)
     let tipeAktif = 'pengeluaran';
 
-    // ---------- 1. LOCALSTORAGE ----------
-    // Membaca data. LocalStorage hanya bisa menyimpan teks,
-    // jadi data diubah dengan JSON.parse (teks -> array).
-    function muatData() {
-      try {
-        const teks = localStorage.getItem(KUNCI_STORAGE);
-        return teks ? JSON.parse(teks) : [];
-      } catch (e) {
-        return []; // Jika data rusak, mulai dari kosong
-      }
-    }
-
-    // Menyimpan data: JSON.stringify mengubah array -> teks.
-    function simpanData() {
-      try {
-        localStorage.setItem(KUNCI_STORAGE, JSON.stringify(transaksi));
-      } catch (e) {
-        // Jika penyimpanan diblokir browser (mis. mode privat), aplikasi tetap jalan
-        // tetapi data tidak tersimpan setelah halaman ditutup.
-      }
-    }
-
-    // Saat halaman dibuka, ambil data yang tersimpan
-    let transaksi = muatData();
+    // Pendek-pendekan untuk document.getElementById
+    const el = (id) => document.getElementById(id);
 
     // ---------- 2. FUNGSI BANTU ----------
-    // Format angka ke Rupiah: 15000 -> "Rp 15.000"
     function formatRupiah(angka) {
       return 'Rp ' + new Intl.NumberFormat('id-ID').format(angka);
     }
 
-    // Mencegah teks buatan pengguna dibaca sebagai kode HTML (keamanan dasar)
+    // Mencegah teks buatan pengguna dibaca sebagai kode HTML
     function aman(teks) {
-      const el = document.createElement('div');
-      el.textContent = teks;
-      return el.innerHTML;
+      const d = document.createElement('div');
+      d.textContent = teks;
+      return d.innerHTML;
     }
 
-    // Ambil bulan/tahun sebuah transaksi.
-    // Transaksi lama (tanpa bulan/tahun) memakai waktu pencatatannya (id).
-    function bulanDari(t) {
-      return typeof t.bulan === 'number' ? t.bulan : new Date(t.id).getMonth();
-    }
-    function tahunDari(t) {
-      return typeof t.tahun === 'number' ? t.tahun : new Date(t.id).getFullYear();
+    // Transaksi lama (tanpa tanggal/bulan/tahun) memakai waktu pencatatannya (id)
+    const bulanDari = (t) => typeof t.bulan === 'number' ? t.bulan : new Date(t.id).getMonth();
+    const tahunDari = (t) => typeof t.tahun === 'number' ? t.tahun : new Date(t.id).getFullYear();
+    const tanggalDari = (t) => typeof t.tanggal === 'number' ? t.tanggal : new Date(t.id).getDate();
+
+    // Ubah "1000000" -> "1.000.000" (sisipkan titik tiap 3 angka dari kanan)
+    function formatTitik(teksAngka) {
+      return teksAngka.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 
-    function tanggalDari(t) {
-      return typeof t.tanggal === 'number' ? t.tanggal : new Date(t.id).getDate();
-    }
+    // ---------- 3. NOMINAL OTOMATIS BERTITIK ----------
+    // Setiap kali mengetik: buang semua yang bukan angka, lalu pasang titik ribuan.
+    el('nominal').addEventListener('input', (e) => {
+      const kolom = e.target;
+      const nilai = kolom.value;
+      // Hitung ada berapa angka di kiri kursor, supaya kursor tidak melompat
+      const angkaDiKiriKursor = nilai.slice(0, kolom.selectionStart).replace(/\D/g, '').length;
 
-    // Isi semua pilihan tanggal, bulan & tahun (formulir dan filter)
+      const bersih = nilai.replace(/\D/g, '').replace(/^0+(?=\d)/, ''); // hanya angka, tanpa nol di depan
+      kolom.value = formatTitik(bersih);
+
+      // Kembalikan kursor ke posisi yang sama (dihitung dari jumlah angka)
+      let hitung = 0, posisi = 0;
+      while (posisi < kolom.value.length && hitung < angkaDiKiriKursor) {
+        if (/\d/.test(kolom.value[posisi])) hitung++;
+        posisi++;
+      }
+      kolom.setSelectionRange(posisi, posisi);
+    });
+
+    // Ambil nominal sebagai angka biasa: "1.500.000" -> 1500000
+    const ambilNominal = () => Number(el('nominal').value.replace(/\./g, ''));
+
+    // ---------- 4. PILIHAN TANGGAL / BULAN / TAHUN ----------
     function isiPilihanPeriode() {
       const sekarang = new Date();
 
-      // Tanggal 1-31
       let opsiTanggal = '';
       for (let d = 1; d <= 31; d++) opsiTanggal += `<option value="${d}">${d}</option>`;
-
-      // Bulan Januari-Desember
-      const opsiBulan = NAMA_BULAN.map((nama, i) => `<option value="${i}">${nama}</option>`).join('');
-
-      // Tahun TAHUN_AWAL sampai TAHUN_AKHIR (2026-2030)
+      const opsiBulan = NAMA_BULAN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
       let opsiTahun = '';
       for (let y = TAHUN_AWAL; y <= TAHUN_AKHIR; y++) opsiTahun += `<option value="${y}">${y}</option>`;
+      opsiTahun += '<option value="lain">Lainnya</option>'; // pilihan untuk mengetik tahun sendiri
 
-      // Formulir: bawaan = hari ini (tahun memakai TAHUN_AWAL jika di luar rentang)
-      document.getElementById('tanggal').innerHTML = opsiTanggal;
-      document.getElementById('bulan').innerHTML = opsiBulan;
-      document.getElementById('tahun').innerHTML = opsiTahun;
-      document.getElementById('tanggal').value = sekarang.getDate();
-      document.getElementById('bulan').value = sekarang.getMonth();
+      el('tanggal').innerHTML = opsiTanggal;
+      el('bulan').innerHTML = opsiBulan;
+      el('tahun').innerHTML = opsiTahun;
+      el('tanggal').value = sekarang.getDate();
+      el('bulan').value = sekarang.getMonth();
       const tahunIni = sekarang.getFullYear();
-      document.getElementById('tahun').value =
-        (tahunIni >= TAHUN_AWAL && tahunIni <= TAHUN_AKHIR) ? tahunIni : TAHUN_AWAL;
+      el('tahun').value = (tahunIni >= TAHUN_AWAL && tahunIni <= TAHUN_AKHIR) ? tahunIni : TAHUN_AWAL;
 
-      // Filter: bawaan = semua
-      document.getElementById('filterBulan').innerHTML = '<option value="semua">Semua bulan</option>' + opsiBulan;
-      document.getElementById('filterTahun').innerHTML = '<option value="semua">Semua tahun</option>' + opsiTahun;
-      document.getElementById('filterBulan').value = filterBulan;
-      document.getElementById('filterTahun').value = filterTahun;
+      el('filterBulan').innerHTML = '<option value="semua">Semua bulan</option>' + opsiBulan;
+      el('filterBulan').value = filterBulan;
     }
 
-    // ---------- 3. MENAMPILKAN DATA ----------
+    // Pilihan tahun di filter = 2026-2030 + tahun lain yang ada di data. Dipanggil tiap data berubah.
+    function isiFilterTahun() {
+      const daftarTahun = new Set();
+      for (let y = TAHUN_AWAL; y <= TAHUN_AKHIR; y++) daftarTahun.add(y);
+      transaksi.forEach(t => daftarTahun.add(tahunDari(t)));
+      const urut = [...daftarTahun].sort((a, b) => a - b);
+
+      el('filterTahun').innerHTML = '<option value="semua">Semua tahun</option>' +
+        urut.map(y => `<option value="${y}">${y}</option>`).join('');
+      // Pertahankan pilihan filter bila tahunnya masih ada
+      if (filterTahun !== 'semua' && !daftarTahun.has(Number(filterTahun))) filterTahun = 'semua';
+      el('filterTahun').value = filterTahun;
+    }
+
+    // Tampilkan kolom ketik tahun bila "Lainnya" dipilih
+    el('tahun').addEventListener('change', (e) => {
+      const lain = e.target.value === 'lain';
+      el('tahunLain').classList.toggle('hidden', !lain);
+      if (lain) el('tahunLain').focus();
+    });
+
+    // Ambil tahun final: dari pilihan 2026-2030 atau dari kolom ketik sendiri
+    const ambilTahun = () =>
+      el('tahun').value === 'lain' ? Number(el('tahunLain').value) : Number(el('tahun').value);
+
+    // ---------- 5. MENAMPILKAN DATA ----------
     function render() {
-      // Saldo selalu dihitung dari SEMUA transaksi (tidak terpengaruh filter)
+      // Saldo selalu dari SEMUA transaksi
       const saldo = transaksi.reduce(
         (jumlah, t) => jumlah + (t.tipe === 'pemasukan' ? t.nominal : -t.nominal), 0);
 
-      // Transaksi pada periode yang dipilih di filter
+      // Transaksi sesuai filter bulan/tahun
       const periode = transaksi.filter(t =>
         (filterBulan === 'semua' || bulanDari(t) === Number(filterBulan)) &&
         (filterTahun === 'semua' || tahunDari(t) === Number(filterTahun)));
 
-      // reduce() menjumlahkan nominal periode itu sesuai tipe
-      const totalMasuk = periode
-        .filter(t => t.tipe === 'pemasukan')
-        .reduce((jumlah, t) => jumlah + t.nominal, 0);
-      const totalKeluar = periode
-        .filter(t => t.tipe === 'pengeluaran')
-        .reduce((jumlah, t) => jumlah + t.nominal, 0);
+      const totalMasuk = periode.filter(t => t.tipe === 'pemasukan').reduce((j, t) => j + t.nominal, 0);
+      const totalKeluar = periode.filter(t => t.tipe === 'pengeluaran').reduce((j, t) => j + t.nominal, 0);
 
-      // Keterangan periode di label kartu, mis. "Mei 2026" atau "semua"
-      const namaPeriode = (filterBulan === 'semua' ? '' : NAMA_BULAN[Number(filterBulan)] + ' ')
-        + (filterTahun === 'semua' ? '' : filterTahun);
-      const ket = namaPeriode.trim() ? ' (' + namaPeriode.trim() + ')' : ' (semua)';
-      document.getElementById('labelMasuk').textContent = 'Pemasukan' + ket;
-      document.getElementById('labelKeluar').textContent = 'Pengeluaran' + ket;
+      const namaPeriode = ((filterBulan === 'semua' ? '' : NAMA_BULAN[Number(filterBulan)] + ' ')
+        + (filterTahun === 'semua' ? '' : filterTahun)).trim();
+      const ket = namaPeriode ? ' (' + namaPeriode + ')' : ' (semua)';
+      el('labelMasuk').textContent = 'Pemasukan' + ket;
+      el('labelKeluar').textContent = 'Pengeluaran' + ket;
 
-      // Isi 3 kartu ringkasan
-      const elSaldo = document.getElementById('saldo');
-      elSaldo.textContent = formatRupiah(saldo);
-      // Saldo negatif diberi warna coral sebagai peringatan
-      elSaldo.className = 'text-3xl font-extrabold mt-1 break-words ' + (saldo < 0 ? 'text-rose-400' : 'text-white');
-      document.getElementById('totalMasuk').textContent = formatRupiah(totalMasuk);
-      document.getElementById('totalKeluar').textContent = formatRupiah(totalKeluar);
+      el('saldo').textContent = formatRupiah(saldo);
+      el('saldo').className = 'text-3xl font-extrabold mt-1 break-words ' + (saldo < 0 ? 'teks-keluar' : 'teks-utama');
+      el('totalMasuk').textContent = formatRupiah(totalMasuk);
+      el('totalKeluar').textContent = formatRupiah(totalKeluar);
 
-      // Susun daftar riwayat: tanggal terbaru di atas, lalu yang paling baru dicatat
-      const daftar = document.getElementById('daftar');
       const terurut = [...periode].sort((a, b) =>
         (tahunDari(b) - tahunDari(a)) || (bulanDari(b) - bulanDari(a)) ||
         (tanggalDari(b) - tanggalDari(a)) || (b.id - a.id));
 
-      daftar.innerHTML = terurut.map(t => {
+      el('daftar').innerHTML = terurut.map(t => {
         const masuk = t.tipe === 'pemasukan';
         return `
-          <li class="flex items-center gap-3 rounded-xl bg-[#1e1e2e] border border-white/5 p-3">
-            <div class="w-1 self-stretch rounded-full ${masuk ? 'bg-teal-300' : 'bg-rose-400'}"></div>
+          <li class="flex items-center gap-3 rounded-xl bg-kartu border garis-warna p-3">
+            <div class="w-1 self-stretch rounded-full ${masuk ? 'bg-masuk' : 'bg-keluar'}"></div>
             <div class="flex-1 min-w-0">
-              <p class="font-semibold text-white truncate">${aman(t.judul)}</p>
-              <p class="text-xs text-zinc-500">${aman(t.kategori)} &middot; ${tanggalDari(t)} ${NAMA_BULAN[bulanDari(t)]} ${tahunDari(t)}</p>
+              <p class="font-semibold teks-utama truncate">${aman(t.judul)}</p>
+              <p class="text-xs teks-sunyi">${aman(t.kategori)} &middot; ${tanggalDari(t)} ${NAMA_BULAN[bulanDari(t)]} ${tahunDari(t)}</p>
             </div>
-            <p class="font-bold whitespace-nowrap ${masuk ? 'text-teal-300' : 'text-rose-400'}">
+            <p class="font-bold whitespace-nowrap ${masuk ? 'teks-masuk' : 'teks-keluar'}">
               ${masuk ? '+' : '-'}${formatRupiah(t.nominal)}
             </p>
-            <!-- data-id dipakai untuk tahu transaksi mana yang dihapus -->
             <button data-id="${t.id}" aria-label="Hapus ${aman(t.judul)}"
-              class="btn-hapus min-h-[44px] px-3 rounded-lg text-sm text-zinc-400 border border-white/10 hover:text-rose-400 hover:border-rose-400/40 transition">
+              class="btn-hapus min-h-[44px] px-3 rounded-lg text-sm teks-redup border garis-warna hover-keluar transition">
               Hapus
             </button>
           </li>`;
       }).join('');
 
-      // Pesan kosong: beda untuk "belum ada data" dan "tidak ada data di periode ini"
-      const kosong = document.getElementById('kosong');
-      kosong.textContent = transaksi.length === 0
+      el('kosong').textContent = transaksi.length === 0
         ? 'Belum ada transaksi. Isi formulir di atas untuk mencatat yang pertama.'
         : 'Tidak ada transaksi pada periode ini.';
-      kosong.classList.toggle('hidden', periode.length > 0);
+      el('kosong').classList.toggle('hidden', periode.length > 0);
     }
 
-    // ---------- 4. FORMULIR ----------
-    // Menyamakan pilihan kategori dengan tipe yang aktif
-    // (nilai kategori sama dengan nama tipe: "Pemasukan" / "Pengeluaran")
-    function isiKategori() {
-      document.getElementById('kategori').value =
-        tipeAktif === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran';
-    }
-
-    // Mengubah tampilan tombol tipe + tombol simpan sesuai pilihan
+    // ---------- 6. FORMULIR ----------
     function aturTipe(tipe) {
       tipeAktif = tipe;
-      const aktifMasuk = 'bg-teal-300 text-[#121212]';
-      const aktifKeluar = 'bg-rose-400 text-[#121212]';
-      const mati = 'text-zinc-400';
+      const aktifMasuk = 'bg-masuk teks-tombol';
+      const aktifKeluar = 'bg-keluar teks-tombol';
+      const mati = 'teks-redup';
 
-      document.getElementById('btnPemasukan').className =
-        'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pemasukan' ? aktifMasuk : mati);
-      document.getElementById('btnPengeluaran').className =
-        'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pengeluaran' ? aktifKeluar : mati);
-      document.getElementById('btnSimpan').className =
-        'w-full min-h-[52px] rounded-xl font-bold text-[#121212] transition active:scale-[0.98] ' +
-        (tipe === 'pemasukan' ? 'bg-teal-300' : 'bg-rose-400');
+      el('btnPemasukan').className = 'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pemasukan' ? aktifMasuk : mati);
+      el('btnPengeluaran').className = 'tipe-btn min-h-[48px] rounded-lg font-semibold transition ' + (tipe === 'pengeluaran' ? aktifKeluar : mati);
+      el('btnSimpan').className = 'w-full min-h-[52px] rounded-xl font-bold teks-tombol transition active:scale-[0.98] '
+        + (tipe === 'pemasukan' ? 'bg-masuk' : 'bg-keluar');
 
-      isiKategori();
-
-      // Contoh isi judul menyesuaikan tipe transaksi
-      document.getElementById('judul').placeholder = tipe === 'pemasukan'
+      el('kategori').value = tipe === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran';
+      el('judul').placeholder = tipe === 'pemasukan'
         ? 'Contoh: Uang jajan / kiriman orang tua'
         : 'Contoh: Makan siang warteg';
     }
 
-    // Klik tombol tipe
     document.querySelectorAll('.tipe-btn').forEach(btn => {
       btn.addEventListener('click', () => aturTipe(btn.dataset.tipe));
     });
-
-    // Kalau kategori diganti lewat dropdown, tipe ikut berubah
-    document.getElementById('kategori').addEventListener('change', (e) => {
+    el('kategori').addEventListener('change', (e) => {
       aturTipe(e.target.value === 'Pemasukan' ? 'pemasukan' : 'pengeluaran');
     });
 
-    // Menampilkan / menyembunyikan pesan error
     function tampilError(pesan) {
-      const el = document.getElementById('pesanError');
-      el.textContent = pesan;
-      el.classList.toggle('hidden', !pesan);
-      if (pesan) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el('pesanError').textContent = pesan;
+      el('pesanError').classList.toggle('hidden', !pesan);
+      if (pesan) el('pesanError').scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
-    // Saat formulir dikirim (tombol Simpan atau Enter)
-    document.getElementById('formTransaksi').addEventListener('submit', (e) => {
-      e.preventDefault(); // Cegah halaman reload
+    // Alamat dokumen/koleksi di Firestore: users / {id akun} / transaksi / {id transaksi}
+    const koleksiTransaksi = () => collection(db, 'users', pengguna.uid, 'transaksi');
 
-      const judul = document.getElementById('judul').value.trim();
-      const nominal = Number(document.getElementById('nominal').value);
-      const kategori = document.getElementById('kategori').value;
-      const tanggal = Number(document.getElementById('tanggal').value);
-      const bulan = Number(document.getElementById('bulan').value);
-      const tahun = Number(document.getElementById('tahun').value);
+    // Saat formulir dikirim
+    el('formTransaksi').addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-      // Validasi sederhana
+      const judul = el('judul').value.trim();
+      const nominal = ambilNominal();
+      const tanggal = Number(el('tanggal').value);
+      const bulan = Number(el('bulan').value);
+      const tahun = ambilTahun();
+
       if (!judul) return tampilError('Judul transaksi belum diisi.');
       if (!nominal || nominal <= 0) return tampilError('Nominal harus lebih dari 0.');
-      // Cek tanggal ada di kalender (mis. 31 Februari tidak ada).
-      // Jika tanggal terlalu besar, JavaScript otomatis pindah ke bulan berikutnya.
+      if (!Number.isInteger(tahun) || tahun < 1900 || tahun > 2100) {
+        return tampilError('Tahun harus berupa angka antara 1900 dan 2100.');
+      }
+      // Cek tanggal ada di kalender (31 Februari tidak ada)
       if (new Date(tahun, bulan, tanggal).getMonth() !== bulan) {
         return tampilError('Tanggal ' + tanggal + ' tidak ada di bulan ' + NAMA_BULAN[bulan] + ' ' + tahun + '.');
       }
       tampilError('');
 
-      // Buat satu objek transaksi. id memakai waktu sekarang (unik untuk tiap transaksi)
-      transaksi.push({
-        id: Date.now(),
-        judul: judul,
-        nominal: Math.round(nominal),
-        kategori: kategori,
-        tanggal: tanggal,
-        bulan: bulan,
-        tahun: tahun,
-        tipe: tipeAktif
-      });
+      const id = Date.now(); // dipakai sebagai nomor unik transaksi
+      try {
+        // setDoc = simpan satu dokumen ke Firestore. Layar diperbarui otomatis oleh onSnapshot.
+        await setDoc(doc(koleksiTransaksi(), String(id)), {
+          id: id,
+          judul: judul,
+          nominal: nominal,
+          kategori: el('kategori').value,
+          tanggal: tanggal,
+          bulan: bulan,
+          tahun: tahun,
+          tipe: tipeAktif
+        });
+      } catch (err) {
+        return tampilError('Gagal menyimpan ke cloud. Periksa koneksi internet. (' + err.code + ')');
+      }
 
-      simpanData(); // simpan ke LocalStorage
-      render();     // gambar ulang layar
-
-      // Kosongkan isian, lalu arahkan kursor ke judul untuk catatan berikutnya
-      document.getElementById('judul').value = '';
-      document.getElementById('nominal').value = '';
-      document.getElementById('judul').focus();
+      el('judul').value = '';
+      el('nominal').value = '';
+      el('judul').focus();
     });
 
-    // Saat filter bulan/tahun diganti, simpan pilihannya lalu gambar ulang
-    document.getElementById('filterBulan').addEventListener('change', (e) => {
-      filterBulan = e.target.value;
-      render();
-    });
-    document.getElementById('filterTahun').addEventListener('change', (e) => {
-      filterTahun = e.target.value;
-      render();
-    });
+    // Filter riwayat
+    el('filterBulan').addEventListener('change', (e) => { filterBulan = e.target.value; render(); });
+    el('filterTahun').addEventListener('change', (e) => { filterTahun = e.target.value; render(); });
 
-    // ---------- 5. HAPUS TRANSAKSI ----------
-    // "Event delegation": satu pendengar di <ul> menangani semua tombol Hapus,
-    // termasuk tombol yang baru dibuat setelah render().
-    document.getElementById('daftar').addEventListener('click', (e) => {
+    // Hapus transaksi (satu pendengar untuk semua tombol Hapus)
+    el('daftar').addEventListener('click', async (e) => {
       const tombol = e.target.closest('.btn-hapus');
       if (!tombol) return;
-
-      const id = Number(tombol.dataset.id);
-      // filter() membuat array baru tanpa transaksi yang dihapus
-      transaksi = transaksi.filter(t => t.id !== id);
-
-      simpanData();
-      render();
+      try {
+        await deleteDoc(doc(koleksiTransaksi(), tombol.dataset.id));
+      } catch (err) {
+        tampilError('Gagal menghapus. Periksa koneksi internet. (' + err.code + ')');
+      }
     });
 
-    // ---------- 6. MULAI ----------
-    isiPilihanPeriode();     // isi pilihan bulan & tahun
-    aturTipe('pengeluaran'); // atur tampilan awal formulir
-    render();                // tampilkan data yang tersimpan
+    // ---------- 7. LOGIN GOOGLE ----------
+    function tampilLayar(nama) {
+      el('layarMuat').classList.toggle('hidden', nama !== 'muat');
+      el('layarLogin').classList.toggle('hidden', nama !== 'login');
+      el('layarApp').classList.toggle('hidden', nama !== 'app');
+    }
+
+    el('btnMasuk').addEventListener('click', async () => {
+      el('pesanLogin').classList.add('hidden');
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider()); // membuka jendela login Google
+      } catch (err) {
+        const pesan = {
+          'auth/popup-closed-by-user': 'Jendela login ditutup. Coba lagi.',
+          'auth/popup-blocked': 'Pop-up diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.',
+          'auth/unauthorized-domain': 'Alamat situs ini belum didaftarkan di Firebase (Authorized domains).'
+        }[err.code] || ('Gagal masuk: ' + err.code);
+        el('pesanLogin').textContent = pesan;
+        el('pesanLogin').classList.remove('hidden');
+      }
+    });
+
+    el('btnKeluar').addEventListener('click', () => signOut(auth));
+
+    // Dijalankan otomatis saat halaman dibuka dan setiap kali status login berubah
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        pengguna = user;
+        el('infoAkun').textContent = 'Masuk sebagai ' + (user.displayName || '') + ' (' + user.email + ')';
+        tampilLayar('app');
+        mulaiMendengarkan();
+      } else {
+        pengguna = null;
+        if (batalLangganan) { batalLangganan(); batalLangganan = null; }
+        transaksi = [];
+        sudahCekMigrasi = false;
+        tampilLayar('login');
+      }
+    });
+
+    // ---------- 8. SINKRONISASI DENGAN FIRESTORE ----------
+    function mulaiMendengarkan() {
+      if (batalLangganan) batalLangganan();
+      // onSnapshot dipanggil sekali di awal dan lagi setiap data berubah (juga dari perangkat lain)
+      batalLangganan = onSnapshot(koleksiTransaksi(), (hasil) => {
+        el('pesanCloud').classList.add('hidden');
+        transaksi = hasil.docs.map(d => d.data());
+
+        // Pertama kali login & cloud masih kosong: tawarkan memindahkan data lama dari browser
+        if (!sudahCekMigrasi) {
+          sudahCekMigrasi = true;
+          if (hasil.empty) pindahkanDataLama();
+        }
+        isiFilterTahun();
+        render();
+      }, (err) => {
+        el('pesanCloud').textContent = 'Gagal memuat data dari cloud (' + err.code + '). Periksa aturan Firestore.';
+        el('pesanCloud').classList.remove('hidden');
+      });
+    }
+
+    // Memindahkan catatan lama (LocalStorage) ke akun Google, sekali saja
+    async function pindahkanDataLama() {
+      try {
+        const lama = JSON.parse(localStorage.getItem(KUNCI_LAMA) || '[]');
+        if (!Array.isArray(lama) || lama.length === 0) return;
+        if (!confirm('Ada ' + lama.length + ' catatan lama di browser ini. Pindahkan ke akun Google Anda?')) return;
+
+        const batch = writeBatch(db); // batch = simpan banyak dokumen sekaligus
+        lama.forEach(t => {
+          batch.set(doc(koleksiTransaksi(), String(t.id)), {
+            ...t, tanggal: tanggalDari(t), bulan: bulanDari(t), tahun: tahunDari(t)
+          });
+        });
+        await batch.commit();
+        localStorage.removeItem(KUNCI_LAMA); // data lama sudah aman di cloud
+      } catch (err) {
+        // Jika gagal, data lama tetap ada di browser
+      }
+    }
+
+    // ---------- 9. TEMA GELAP / TERANG ----------
+    const KUNCI_TEMA = 'tema-aplikasi';
+
+    function terapkanTema(tema, simpan) {
+      document.documentElement.setAttribute('data-tema', tema); // CSS membaca atribut ini
+      // Warna bilah browser di HP ikut berubah
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', tema === 'terang' ? '#f8fafc' : '#0f172a');
+      // Tombol menampilkan tema TUJUAN
+      document.querySelectorAll('.btn-tema').forEach(tombol => {
+        tombol.textContent = tema === 'terang' ? '\u{1F319} Gelap' : '\u2600\uFE0F Terang';
+        tombol.setAttribute('aria-label', tema === 'terang' ? 'Ganti ke tema gelap' : 'Ganti ke tema terang');
+      });
+      if (simpan) {
+        try { localStorage.setItem(KUNCI_TEMA, tema); } catch (e) { /* abaikan bila diblokir */ }
+      }
+    }
+
+    document.querySelectorAll('.btn-tema').forEach(tombol => {
+      tombol.addEventListener('click', () => {
+        const sekarang = document.documentElement.getAttribute('data-tema');
+        terapkanTema(sekarang === 'terang' ? 'gelap' : 'terang', true);
+      });
+    });
+
+    // Terapkan tema yang sudah dipasang skrip di <head> (tanpa menyimpan ulang)
+    terapkanTema(document.documentElement.getAttribute('data-tema') === 'terang' ? 'terang' : 'gelap', false);
+
+    // ---------- 10. MULAI ----------
+    isiPilihanPeriode();
+    aturTipe('pengeluaran');
+    if (BELUM_DIISI) {
+      // Pengingat untuk pemula: firebaseConfig belum diganti
+      el('btnMasuk').disabled = true;
+      el('btnMasuk').classList.add('opacity-50');
+      el('pesanLogin').textContent = 'firebaseConfig belum diisi. Ganti nilai "ISI_..." di bagian JavaScript.';
+      el('pesanLogin').classList.remove('hidden');
+      tampilLayar('login');
+    }
   </script>
 </body>
 </html>
